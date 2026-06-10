@@ -1,3 +1,5 @@
+> **This is the PROJECT-LEVEL CLAUDE.md** — applies to this repository only.
+
 # CLAUDE.md
 
 Entry point for AI assistants (Claude Code, Copilot, etc.) working on this repo. Read this every session before touching code.
@@ -15,9 +17,9 @@ These have been learned the hard way over hundreds of sessions. Re-deriving why 
 ### Build / commit / tooling
 
 - **NEVER build the project.** Never run `make`, `make server`, or any compile/link command. The human builds locally. Static re-reading of the code is the only acceptable verification.
-- **NEVER auto-commit.** The human controls all `git commit`s. Even if a plan you wrote and the human approved lists "git commit" as a step, do NOT commit. Stage at most. Plans should omit commit steps entirely.
+- **Never commit unprompted.** Don't auto-commit. When changes are ready, write the commit message(s), propose them, and ask — the human decides when to commit. Only run `git commit` after the human gives the go-ahead. Don't commit just because a plan lists it as a step.
 - **Add every new `.cpp` to `Makefile`** in the same response that creates it. The Makefile uses an explicit source list, NOT wildcards. Forgetting → silent skip → linker `undefined reference` → wasted build cycle. Treat `.cpp` creation + `Makefile` edit as atomic.
-- **No filesystem snooping.** Do not `find /`, do not read or list paths outside the project repo without asking first. If you think you need a file outside `src/`, ask.
+- **No filesystem snooping.** Do not `find /`. Reading is fine within the project repo and one level up — anywhere under `C:\GlobalAgendaPrivateServer\` (e.g. `ga-source`, `admin\docs`). Ask before reading anything outside that tree — other drives (e.g. the `F:` game install), system paths, or unrelated locations.
 
 ### Project mindset
 
@@ -28,7 +30,7 @@ These have been learned the hard way over hundreds of sessions. Re-deriving why 
 - **Apply, don't describe.** When the fix is concrete and low-risk, make the edit. Don't end the turn with a how-to paragraph.
 - **No speculation.** Only state facts from logs, code, and test results. Theories about why something might work go in conversation, not in source comments and not as final answers.
 - **Comment out, don't delete.** When disabling code, use `//` not deletion. Code you removed is easier to restore from `//` than from `git log`.
-- **Short verified comments only.** No long comments, no theories in source. The "why" of a tricky line is one sentence. Speculation belongs in the conversation.
+- **Comments: terse by default; a longer structured comment only where the WHY is genuinely hard.** Default to no comments. Add one only when a future reader would otherwise be confused — hidden constraints, subtle invariants, surprising behavior, bug-specific workarounds. Keep them direct: one short line, two max. Don't write paragraphs, don't reference current-task context ("we did X because the audit said Y"), don't include file:line numbers (they rot), don't explain WHAT the code does (well-named identifiers handle that), don't repeat commit messages or Memory files, don't put theories or speculation in source. **Exception — fragile engine-hook, platform-split, protocol, replication, and lifecycle code:** here the rationale is non-obvious and worth preserving, so a longer structured comment is correct — e.g. a hook `.cpp` header block (problem, mechanism, data references), a decompile-address citation behind a raw offset, or a crash-signature / Windows-vs-Linux note beside the branch it justifies. If removing a comment wouldn't confuse anyone, don't write it.
 
 ### Hooking & native reimplementation
 
@@ -67,7 +69,7 @@ These have been learned the hard way over hundreds of sessions. Re-deriving why 
 
 - **Field naming:** `r_` = replicated, `s_` = server-only, `c_` = client-only, `m_` = member. Match the convention on existing fields when adding new ones.
 - **Hook layout:** one hook per file under `src/GameServer/<Subsystem>/<Class>/<Native>/<Native>.{hpp,cpp}`. The `.hpp` declares `HookBase<...>`; the `.cpp` implements `Call()`.
-- **DB lives at `<repo-root>/server.db`** (a SQLite file). NOT at `data/server.db` — that's a different file. Use the sqlite3 CLI to read schema/data; never trust stale dumps.
+- **DB lives at `out/server.db`** on Windows (~9 MB SQLite file). Linux/Wine path may differ — ask the human if unsure. Use the sqlite3 CLI to read schema/data; never trust stale dumps.
 - **Don't trust SDK `StaticClass()`** — the generated indices misalign with the binary's `GObjObjects`. Use `ClassPreloader::GetClass("Class Pkg.Name")`.
 - **SDK `eventXxx()` wrappers resolve the BASE class.** Calling `effect->eventRemove()` from C++ runs `TgEffect.Remove`, not the `TgEffectBuff` override. Dispatch by actual class when polymorphism matters.
 - **TArray:** use the SDK `TArray<T>` methods directly. `Add()`, `Clear()`, and the default ctor all route through `GAllocator`, and `Add()` handles an uninitialized (`Data==NULL`, `Count=Max=0`) array correctly. You don't need an init macro — just call `Add` on the field. There is no `Empty()`; use `Clear()`. Never `libc free/realloc` on `.Data` — UE3's allocator owns it.
@@ -83,7 +85,7 @@ These have been learned the hard way over hundreds of sessions. Re-deriving why 
   - `src/IpcClient/` — control ↔ DLL IPC
   - `src/Utils/` — caches (`ObjectClassCache`, `ObjectCache`, `ActorCache`, `ClassPreloader`), `Logger`, `Macros.hpp`
 - `Makefile` — explicit source list. Add new `.cpp` here.
-- `server.db` — SQLite at repo root. Asset / blueprint / effect data.
+- `out/server.db` — active SQLite DB on Windows builds via `windows-server-menu.bat`. Linux/Wine path may differ.
 - `control-server.json` — runtime knobs, log channel toggles.
 - Existing technical docs in the repo: `bots.md`, `deployables.md`, `device_volumes.md`, `equip-slots.md`, `equippable-devices.md`, `medsec_spawn_tables.md`, `umax_spawn_tables.md`, `docs/gameplay/rest-device-slot14.md`. Read the relevant one before working in an area.
 
@@ -99,6 +101,6 @@ Bigger detail lives in `docs/claude/`. Don't load eagerly; pull when relevant.
 ## Working agreement (style)
 
 - Ask questions in chat as plain text. Don't gate replies behind `AskUserQuestion` with pre-canned options unless the choice is genuinely closed.
-- Don't re-verify things that have been proven working (SDK wrappers, HookBase mechanics, etc.). Trust the existing infrastructure.
+- Never assume behavior or logic — always verify by reading the code. No need to re-read static reference files (SDK headers, etc.) already read in the current session.
 - When digging through Ghidra output, paginate searches (`limit=200` truncates large classes). Don't trust agent-style `(class level)` tags — verify the cited line is actually inside `defaultproperties{}`, not a function body.
 - Log location varies by dev environment — channel files land at `<Logger::LogDir>/<channel>.txt`, where `LogDir` defaults to `"C:"` (resolves to `<wineprefix>/drive_c/<channel>.txt` under Wine) and can be overridden per instance via `Config::GetLogDir()` to isolate logs across parallel instances. Don't assume a path — ask the human where their logs land. Also: don't trust client-side logs by default; the human may not be running with a client DLL injected, in which case client log files are stale leftovers from prior sessions.
